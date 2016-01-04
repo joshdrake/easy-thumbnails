@@ -27,8 +27,11 @@ class Aliases(object):
         settings_aliases = settings.THUMBNAIL_ALIASES
         if settings_aliases:
             for target, aliases in settings_aliases.items():
-                target_aliases = self._aliases.setdefault(target, {})
-                target_aliases.update(aliases)
+                if callable(aliases):
+                    self._aliases.setdefault(target, aliases)
+                else:
+                    target_aliases = self._aliases.setdefault(target, {})
+                    target_aliases.update(aliases)
 
     def set(self, alias, options, target=None):
         """
@@ -54,7 +57,7 @@ class Aliases(object):
         If no matching alias is found, returns ``None``.
         """
         for target_part in reversed(list(self._get_targets(target))):
-            options = self._get(target_part, alias)
+            options = self._get(target, target_part, alias)
             if options:
                 return options
 
@@ -74,16 +77,22 @@ class Aliases(object):
         """
         aliases = {}
         for target_part in self._get_targets(target, include_global):
-            aliases.update(self._aliases.get(target_part, {}))
+            target_part_aliases = self._aliases.get(target_part, {})
+            if callable(target_part_aliases):
+                target_part_aliases = target_part_aliases(target)
+            aliases.update(target_part_aliases)
         return aliases
 
-    def _get(self, target, alias):
+    def _get(self, target, target_part, alias):
         """
         Internal method to get a specific alias.
         """
-        if target not in self._aliases:
+        if target_part not in self._aliases:
             return
-        return self._aliases[target].get(alias)
+        aliases = self._aliases[target_part]
+        if callable(aliases):
+            aliases = aliases(target)
+        return aliases.get(alias)
 
     def _get_targets(self, target, include_global=True):
         """
@@ -115,12 +124,7 @@ class Aliases(object):
             return target
         if not hasattr(target, 'instance'):
             return None
-
-        if getattr(target.instance, '_deferred', False):
-            model = target.instance._meta.proxy_for_model
-        else:
-            model = target.instance.__class__
-
+        model = target.instance.__class__
         return '%s.%s.%s' % (
             model._meta.app_label,
             model.__name__,
