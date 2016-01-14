@@ -94,4 +94,4 @@ class ThumbnailDimensions(models.Model):
 
 
 models.signals.pre_save.connect(signal_handlers.find_uncommitted_filefields)
-models.signals.post_save.connect(signal_handlers.signal_committed_filefields)
+models.signals.post_save.connect(signal_handlers.signal_updated_filefields)
